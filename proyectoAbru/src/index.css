@@ -1,0 +1,22 @@
+/* src/index.css */
+@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Montserrat:wght@300;400;500;700&family=Merriweather:wght@300;400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Opcional: Aplicar una fuente base al cuerpo del documento */
+body {
+  @apply font-sans text-text-primary bg-white-off; /* Usando tus colores y fuentes personalizadas */
+  -webkit-font-smoothing: antialiased; /* Mejora el renderizado de fuentes en algunos navegadores */
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Opcional: Crear algunas clases personalizadas reutilizables (estilo editorial) */
+.editorial-title {
+  @apply font-serif text-3xl md:text-4xl font-light tracking-wider mb-4 text-text-primary;
+}
+
+.script-logo {
+  @apply font-script text-accent-script; /* Estilo para el logo o nombre de la fotógrafa */
+}
