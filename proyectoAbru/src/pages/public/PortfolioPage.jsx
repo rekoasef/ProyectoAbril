@@ -1,7 +1,7 @@
 // src/pages/public/PortfolioPage.jsx
 import React, { useState, useEffect } from 'react';
-import ImageCard from '../../component/ui/ImageCard'; // Verifica esta ruta
-import Modal from '../../component/Modal';     // Verifica esta ruta
+import ImageCard from '../../components/ui/ImageCard'; // Verifica esta ruta
+import Modal from '../../components/common/Modal';     // Verifica esta ruta
 import { AdvancedImage, responsive, placeholder } from '@cloudinary/react';
 import { Cloudinary } from "@cloudinary/url-gen";
 import { limitFit } from "@cloudinary/url-gen/actions/resize";

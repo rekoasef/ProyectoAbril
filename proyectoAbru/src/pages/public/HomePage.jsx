@@ -1,7 +1,7 @@
 // src/pages/public/HomePage.jsx
 import React from 'react';
 import { Link } from 'react-router-dom';
-import Hero from '../../component/ui/Hero';
+import Hero from '../../components/ui/Hero';
 import { Camera, Users, Heart } from 'lucide-react'; // Iconos para las tarjetas de características
 
 const HomePage = () => {

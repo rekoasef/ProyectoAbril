@@ -1,8 +1,8 @@
 // src/components/layout/PublicLayout.jsx
 import React from 'react';
 import { Outlet } from 'react-router-dom';
-import Navbar from './layout/Navbar'; // Asegúrate de que esta línea esté descomentada
-import Footer from './layout/Footer'; // Asegúrate de que esta línea esté descomentada
+import Navbar from './Navbar'; // Asegúrate de que esta línea esté descomentada
+import Footer from './Footer'; // Asegúrate de que esta línea esté descomentada
 
 const PublicLayout = () => {
   return (

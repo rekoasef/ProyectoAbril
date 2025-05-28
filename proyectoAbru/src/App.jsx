@@ -1,10 +1,14 @@
 // src/App.jsx
+import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 
-// Importar el Layout Público
-import PublicLayout from './component/PublicLayout';
+// Layouts
+import PublicLayout from './components/layout/PublicLayout';
+import AdminLayout from './components/layout/AdminLayout';
+import ProtectedRoute from './components/common/ProtectedRoute';
 
-// Importar las páginas públicas
+// Páginas Públicas
+// ... (tus importaciones de páginas públicas)
 import HomePage from './pages/public/HomePage';
 import PortfolioPage from './pages/public/PortfolioPage';
 import ServicesPage from './pages/public/ServicesPage';
@@ -12,25 +16,41 @@ import AboutPage from './pages/public/AboutPage';
 import ContactPage from './pages/public/ContactPage';
 import NotFoundPage from './pages/public/NotFoundPage';
 
+
+// Páginas de Admin
+import AdminLoginPage from './pages/admin/AdminLoginPage';
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
+import AdminPortfolioPage from './pages/admin/AdminPortfolioPage'; // <--- AÑADIR IMPORTACIÓN
+
 function App() {
   return (
     <Routes>
-      {/* ESTA ES LA PARTE CLAVE:
-          La ruta para "/" carga PublicLayout, y DENTRO de PublicLayout
-          se renderizarán las rutas hijas (HomePage, PortfolioPage, etc.)
-          gracias al componente <Outlet /> en PublicLayout.
-      */}
+      {/* Rutas Públicas */}
       <Route path="/" element={<PublicLayout />}>
-        <Route index element={<HomePage />} /> {/* HomePage es la página índice para "/" */}
+        <Route index element={<HomePage />} />
         <Route path="portfolio" element={<PortfolioPage />} />
         <Route path="servicios" element={<ServicesPage />} />
         <Route path="sobre-mi" element={<AboutPage />} />
         <Route path="contacto" element={<ContactPage />} />
-        {/* Si quieres que NotFoundPage también use el layout, muévela aquí */}
-        {/* <Route path="*" element={<NotFoundPage />} /> */}
       </Route>
 
-      {/* Si NotFoundPage está aquí, se renderizará SIN Navbar ni Footer */}
+      {/* Rutas de Admin */}
+      <Route path="/admin/login" element={<AdminLoginPage />} />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<AdminDashboardPage />} />
+        <Route path="portfolio" element={<AdminPortfolioPage />} /> {/* <--- AÑADIR RUTA */}
+        {/* Aquí irán más rutas de admin anidadas, ej:
+        <Route path="servicios" element={<AdminServicesPage />} />
+        */}
+      </Route>
+
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

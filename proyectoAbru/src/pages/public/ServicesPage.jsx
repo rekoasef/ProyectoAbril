@@ -1,7 +1,7 @@
 // src/pages/public/ServicesPage.jsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import ServiceCard from '../../component/ui/ServiceCard'; // Verifica la ruta
+import ServiceCard from '../../components/ui/ServiceCard'; // Verifica la ruta
 
 // --- COMIENZA A EDITAR AQUÍ CON TUS PROPIOS SERVICIOS ---
 // DATOS DE EJEMPLO - Reemplaza con tus propios servicios.
