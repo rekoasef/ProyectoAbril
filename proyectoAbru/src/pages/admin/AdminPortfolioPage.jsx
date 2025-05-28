@@ -1,19 +1,10 @@
 // src/pages/admin/AdminPortfolioPage.jsx
+import { getStoredPortfolioImagesFS as getStoredPortfolioImages, storePortfolioImagesFS as storePortfolioImages } from '../../utils/localStorageHelpers';
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { UploadCloud, Eye, Trash2 } from 'lucide-react';
 import { storage } from '../../firebase/firebaseConfig'; // Importar storage de Firebase
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
-
-// Funciones para localStorage
-const getStoredPortfolioImages = () => {
-  const images = localStorage.getItem('sevePhotographyFirebasePortfolio'); // Nueva clave para Firebase
-  return images ? JSON.parse(images) : [];
-};
-
-const storePortfolioImages = (images) => {
-  localStorage.setItem('sevePhotographyFirebasePortfolio', JSON.stringify(images));
-};
 
 const AdminPortfolioPage = () => {
   const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm();

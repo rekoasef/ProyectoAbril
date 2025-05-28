@@ -1,12 +1,13 @@
 // src/pages/public/AboutPage.jsx
 import React from 'react';
 import { Instagram, Mail, Phone, Camera, Heart, Aperture } from 'lucide-react';
-import { CLOUDINARY_CLOUD_NAME } from '../../utils/cloudinaryConfig';
+// Ya no necesitamos nada de Cloudinary aquí
 
 // --- DATOS DE LA FOTÓGRAFA ---
 const photographerInfo = {
   name: "SeVe",
-  imagePublicId: 'mi_perfil_seve_2025', // TU PUBLIC ID CONFIRMADO
+  // URL DE DESCARGA HTTPS COMPLETA DE TU FOTO DE PERFIL DESDE FIREBASE STORAGE
+  profilePictureUrl: 'https://firebasestorage.googleapis.com/v0/b/seve-photography-web.firebasestorage.app/o/profile%2FIMG_5473.jpeg?alt=media&token=c2771598-9ffb-4789-b0d5-54d63b05ea4e',
   tagline: "Fotógrafa apasionada por capturar la belleza en lo auténtico.",
   bio: [
     "¡Hola! Soy SeVe, y la fotografía es más que mi profesión, es mi manera de ver y sentir el mundo. Desde que descubrí el poder de una imagen para contar historias y preservar emociones, supe que quería dedicarme a ello.",
@@ -22,20 +23,14 @@ const photographerInfo = {
 // --- FIN DE DATOS ---
 
 const AboutPage = () => {
-  let profileImageUrl = null;
-  const canDisplayImage = photographerInfo.imagePublicId &&
-                         CLOUDINARY_CLOUD_NAME &&
-                         CLOUDINARY_CLOUD_NAME !== 'TU_CLOUD_NAME_AQUI'; // Verifica contra el placeholder original
+  const profileImageUrl = photographerInfo.profilePictureUrl;
 
-  if (canDisplayImage) {
-    profileImageUrl = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/w_600,c_limit,q_auto,f_auto/${photographerInfo.imagePublicId}`;
-    console.log("AboutPage - URL de Foto de Perfil Generada:", profileImageUrl);
-  } else {
-    console.log("AboutPage - No se puede generar URL de foto de perfil. Verifica imagePublicId y CLOUDINARY_CLOUD_NAME.");
-    if (CLOUDINARY_CLOUD_NAME === 'TU_CLOUD_NAME_AQUI') {
-        console.warn("AboutPage - CLOUDINARY_CLOUD_NAME sigue siendo el placeholder 'TU_CLOUD_NAME_AQUI' en cloudinaryConfig.js.");
-    }
-  }
+  console.log("AboutPage - URL de Foto de Perfil:", profileImageUrl);
+
+  // Verifica si la URL es el placeholder o está vacía
+  const isValidProfileUrl = profileImageUrl && 
+                           profileImageUrl !== 'URL_DE_TU_FOTO_DE_PERFIL_EN_FIREBASE' && // El placeholder original
+                           profileImageUrl !== 'COPIA_AQUI_TU_URL_DE_DESCARGA_HTTPS_DE_FIREBASE'; // Otro placeholder que usamos
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-16 md:space-y-20 min-h-[calc(100vh-20rem)]">
@@ -46,22 +41,22 @@ const AboutPage = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-8 md:gap-12 items-start">
         <div className="md:col-span-2 flex justify-center md:justify-start">
-          {profileImageUrl ? (
+          {isValidProfileUrl ? (
             <div className="w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-full overflow-hidden shadow-soft-md border-4 border-white-off mx-auto md:mx-0">
               <img
                 src={profileImageUrl}
                 alt={`Retrato de ${photographerInfo.name}`}
                 className="w-full h-full object-cover"
                 onError={(e) => {
-                  console.error(`Error cargando foto de perfil: ${e.target.src}`, e);
+                  console.error(`Error cargando foto de perfil desde Firebase: ${e.target.src}`, e);
                 }}
               />
             </div>
           ) : (
             <div className="w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-full bg-beige-light flex items-center justify-center shadow-soft-md border-4 border-white-off mx-auto md:mx-0">
               <Camera size={80} className="text-sepia-gray-soft" strokeWidth={1}/>
-              {CLOUDINARY_CLOUD_NAME === 'TU_CLOUD_NAME_AQUI' && (
-                 <p className="text-xs text-red-500 mt-2 absolute bottom-2 left-1/2 -translate-x-1/2">Cloudinary no configurado</p>
+              {!isValidProfileUrl && ( // Muestra el mensaje si la URL no es válida (es uno de los placeholders)
+                 <p className="text-xs text-red-500 mt-2 absolute bottom-2 left-1/2 -translate-x-1/2">Configura la URL de tu foto</p>
               )}
             </div>
           )}
