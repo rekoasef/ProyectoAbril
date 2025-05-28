@@ -3,14 +3,12 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { Send } from 'lucide-react';
 
-// DESCOMENTA ESTO:
-const FORMSPREE_ENDPOINT = "https://formspree.io/f/mqaqrlnq"; // ¡RECUERDA PONER TU ID REAL!
+// REEMPLAZA ESTO CON TU ENDPOINT DE FORMSPREE REAL
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/mqaqrlnq";
 
 const ContactForm = () => {
-  console.log("Renderizando ContactForm (con useForm y onSubmit)");
   const { register, handleSubmit, formState: { errors, isSubmitting, isSubmitSuccessful }, reset } = useForm();
 
-  // DESCOMENTA ESTA FUNCIÓN COMPLETA:
   const onSubmit = async (data) => {
     try {
       const response = await fetch(FORMSPREE_ENDPOINT, {
@@ -24,7 +22,9 @@ const ContactForm = () => {
 
       if (response.ok) {
         reset(); // Limpia el formulario después de un envío exitoso
+        // Puedes añadir un mensaje de éxito más visible si quieres
       } else {
+        // Formspree podría devolver un error en formato JSON
         const errorData = await response.json();
         if (errorData.errors && errorData.errors.length > 0) {
           alert(`Error: ${errorData.errors.map(err => err.message).join(', ')}`);
@@ -40,14 +40,12 @@ const ContactForm = () => {
 
   return (
     <div className="bg-beige-light p-8 md:p-10 rounded-lg shadow-soft">
-      {/* DESCOMENTA ESTO TAMBIÉN: */}
       {isSubmitSuccessful && (
         <div className="mb-6 p-4 bg-green-100 text-green-700 border border-green-300 rounded-md text-sm">
           ¡Mensaje enviado con éxito! Gracias por contactarme, te responderé a la brevedad.
         </div>
       )}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* ... (resto del formulario igual que en el paso anterior) ... */}
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-text-primary mb-1">Nombre Completo</label>
           <input
@@ -111,4 +109,5 @@ const ContactForm = () => {
     </div>
   );
 };
+
 export default ContactForm;
