@@ -1,37 +1,49 @@
 // src/pages/public/PortfolioPage.jsx
 import React, { useState, useEffect } from 'react';
-import ImageCard from '../../components/ui/ImageCard'; // Verifica esta ruta
-import Modal from '../../components/common/Modal';     // Verifica esta ruta
-import { AdvancedImage, responsive, placeholder } from '@cloudinary/react';
-import { Cloudinary } from "@cloudinary/url-gen";
-import { limitFit } from "@cloudinary/url-gen/actions/resize";
-import { quality, format } from "@cloudinary/url-gen/actions/delivery";
-import { CLOUDINARY_CLOUD_NAME } from '../../utils/cloudinaryConfig'; // Verifica esta ruta
+// Ya no necesitamos el Modal como componente separado si usamos la versión simple de abajo
+// import Modal from '../../components/common/Modal'; 
 
-// Inicializa Cloudinary con tu cloud name
-const cld = new Cloudinary({
-  cloud: {
-    cloudName: CLOUDINARY_CLOUD_NAME // Asegúrate que CLOUDINARY_CLOUD_NAME esté bien configurado
-  }
-});
+// Helper para obtener imágenes de localStorage (debe ser la misma que en AdminPortfolioPage)
+const getStoredPortfolioImages = () => {
+  const images = localStorage.getItem('sevePhotographyFirebasePortfolio'); // Usar la nueva clave
+  return images ? JSON.parse(images) : [];
+};
 
-// --- EMPieza a EDITAR AQUÍ con tus PROPIOS DATOS ---
-// DATOS DE EJEMPLO - Reemplaza con tus propios Public IDs y detalles.
-// Sube tus imágenes a Cloudinary y usa sus Public IDs.
-// Asegúrate que los publicId coincidan con lo que tienes en Cloudinary.
-const samplePortfolioImages = [
-  { publicId: 'portfolio/bodas/boda_ejemplo_1', category: 'Bodas', title: 'Atardecer Romántico', description: 'Pareja disfrutando de un hermoso atardecer en su día especial.' },
-  { publicId: 'portfolio/quince/quince_ejemplo_1', category: '15 Años', title: 'Sueños de Juventud', description: 'Celebrando una etapa mágica llena de alegría e ilusión.' },
-  { publicId: 'portfolio/retratos/retrato_ejemplo_1', category: 'Retratos', title: 'Mirada Intensa', description: 'Un retrato que captura la esencia y la personalidad del sujeto.' },
-  { publicId: 'portfolio/bodas/boda_ejemplo_2', category: 'Bodas', title: 'Detalles Preciosos', description: 'Los pequeños detalles que hacen único un día de boda.' },
-  { publicId: 'portfolio/eventos/evento_ejemplo_1', category: 'Eventos', title: 'Celebración Familiar', description: 'Cobertura de un evento familiar, capturando sonrisas y momentos.' },
-  { publicId: 'portfolio/retratos/retrato_ejemplo_2', category: 'Retratos', title: 'Sonrisa Contagiosa', description: 'La alegría reflejada en una sonrisa genuina y espontánea.' },
-  // --- TERMINA DE EDITAR AQUÍ ---
-  // Puedes añadir más objetos de imagen aquí, siguiendo el mismo formato.
-  // Ejemplo:
-  // { publicId: 'tu_carpeta_cloud/tu_imagen', category: 'TuCategoría', title: 'TuTítulo', description: 'TuDescripción' },
-];
-// --- FIN DE LA SECCIÓN DE DATOS DE EJEMPLO ---
+// Componente Modal simple (si no usas uno común)
+const ImageModal = ({ isOpen, onClose, image }) => {
+  if (!isOpen || !image) return null;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100] p-4 transition-opacity duration-300"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white-off rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-4 md:p-6 relative transform transition-all duration-300 scale-95 opacity-0 animate-modalShow"
+        onClick={e => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="text-text-secondary hover:text-accent-script p-1 rounded-full absolute top-3 right-3 z-10 bg-white-off/80 hover:bg-beige-light"
+          aria-label="Cerrar modal"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+        {image.url ? ( // image.url es la downloadURL de Firebase
+          <img
+            src={image.url}
+            alt={image.title || "Imagen del portfolio"}
+            className="w-full h-auto rounded-md object-contain max-h-[calc(90vh-80px)]"
+          />
+        ) : <p>No se pudo cargar la imagen.</p>}
+        <div className="mt-4 text-center md:text-left">
+          <h3 className="text-xl font-serif text-accent-script">{image.title}</h3>
+          {image.description && <p className="text-text-secondary text-sm mt-1">{image.description}</p>}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 
 const PortfolioPage = () => {
@@ -44,17 +56,15 @@ const PortfolioPage = () => {
   const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
-    if (samplePortfolioImages.length === 0) {
-        console.warn("No hay imágenes de ejemplo configuradas en PortfolioPage.jsx. Por favor, añade tus Public IDs.");
+    const loadedImages = getStoredPortfolioImages();
+    setImages(loadedImages);
+    setFilteredImages(loadedImages); // Mostrar todas al inicio
+    if (loadedImages.length > 0) {
+      const uniqueCategories = ['Todos', ...new Set(loadedImages.map(img => img.category).filter(Boolean))];
+      setCategories(uniqueCategories);
+    } else {
+      setCategories(['Todos']);
     }
-    if (!CLOUDINARY_CLOUD_NAME || CLOUDINARY_CLOUD_NAME === 'TU_CLOUD_NAME_AQUI') {
-        console.error("CLOUDINARY_CLOUD_NAME no está configurado en cloudinaryConfig.js. Las imágenes no se cargarán.");
-    }
-
-    setImages(samplePortfolioImages);
-    setFilteredImages(samplePortfolioImages);
-    const uniqueCategories = ['Todos', ...new Set(samplePortfolioImages.map(img => img.category).filter(Boolean))];
-    setCategories(uniqueCategories);
   }, []);
 
   const handleFilter = (category) => {
@@ -76,15 +86,8 @@ const PortfolioPage = () => {
     setSelectedImage(null);
   };
 
-  const modalImageTransformation = selectedImage ?
-    cld.image(selectedImage.publicId)
-       .resize(limitFit().width(1200).height(800))
-       .delivery(quality('auto'))
-       .delivery(format('auto'))
-    : null;
-
   return (
-    <div className="container mx-auto px-4 py-8 space-y-12 min-h-[calc(100vh-20rem)]"> {/* min-h para empujar footer */}
+    <div className="container mx-auto px-4 py-8 space-y-12 min-h-[calc(100vh-20rem)]">
       <div className="text-center">
         <h1 className="editorial-title">Mi Trabajo</h1>
         <p className="text-text-secondary max-w-xl mx-auto">
@@ -92,8 +95,7 @@ const PortfolioPage = () => {
         </p>
       </div>
 
-      {/* Filtros de Categoría */}
-      {categories.length > 1 && ( // Solo mostrar filtros si hay más que "Todos"
+      {categories.length > 1 && (
         <div className="flex flex-wrap justify-center gap-3 md:gap-4 mb-8">
           {categories.map(category => (
             <button
@@ -111,39 +113,39 @@ const PortfolioPage = () => {
         </div>
       )}
 
-      {/* Grid de Imágenes */}
       {filteredImages.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
           {filteredImages.map((image) => (
-            <ImageCard
-              key={image.publicId}
-              publicId={image.publicId}
-              alt={image.title || `Imagen de ${image.category}`}
+            <div
+              key={image.id || image.firebasePath} // Usar un ID único
+              className="aspect-[4/3] bg-beige-light rounded-lg overflow-hidden shadow-soft hover:shadow-soft-md transition-all duration-300 cursor-pointer group"
               onClick={() => openImageModal(image)}
-            />
+            >
+              {image.url ? ( // image.url es la downloadURL de Firebase
+                <img
+                  src={image.url}
+                  alt={image.title || `Fotografía de ${image.category}`}
+                  className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
+                  loading="lazy"
+                  onError={(e) => {
+                    console.error(`Error cargando imagen de grid (pública) para ${image.id}: ${e.target.src}`);
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-text-secondary">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       ) : (
         <p className="text-center text-text-secondary col-span-full py-10">
-          Actualmente no hay imágenes para mostrar en esta categoría o aún no se han cargado.
-          {selectedCategory === 'Todos' && images.length === 0 && " Por favor, configura las imágenes en el código."}
+          Aún no hay imágenes en el portfolio. ¡Vuelve pronto!
         </p>
       )}
 
-      {/* Modal para la Imagen */}
-      {selectedImage && modalImageTransformation && (
-        <Modal isOpen={isModalOpen} onClose={closeImageModal} title={selectedImage.title}>
-          <AdvancedImage
-            cldImg={modalImageTransformation}
-            plugins={[responsive({ steps: [400, 800, 1200] }), placeholder({mode: 'blur'})]}
-            className="w-full h-auto rounded-md object-contain max-h-[calc(90vh-100px)]" // Ajusta max-h para el contenido del modal
-            alt={selectedImage.title || "Imagen del portfolio"}
-          />
-          {selectedImage.description && (
-            <p className="text-text-secondary mt-4 text-sm">{selectedImage.description}</p>
-          )}
-        </Modal>
-      )}
+      <ImageModal isOpen={isModalOpen} onClose={closeImageModal} image={selectedImage} />
     </div>
   );
 };

@@ -21,6 +21,7 @@ import NotFoundPage from './pages/public/NotFoundPage';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import AdminPortfolioPage from './pages/admin/AdminPortfolioPage'; // <--- AÑADIR IMPORTACIÓN
+import AdminServicesPage from './pages/admin/AdminServicesPage'
 
 function App() {
   return (
@@ -46,6 +47,7 @@ function App() {
       >
         <Route index element={<AdminDashboardPage />} />
         <Route path="portfolio" element={<AdminPortfolioPage />} /> {/* <--- AÑADIR RUTA */}
+        <Route path="servicios" element={<AdminServicesPage />} /> {/* <--- AÑADIR RUTA */}
         {/* Aquí irán más rutas de admin anidadas, ej:
         <Route path="servicios" element={<AdminServicesPage />} />
         */}

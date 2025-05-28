@@ -1,17 +1,12 @@
 // src/pages/public/AboutPage.jsx
 import React from 'react';
 import { Instagram, Mail, Phone, Camera, Heart, Aperture } from 'lucide-react';
-import { AdvancedImage, responsive, placeholder } from '@cloudinary/react';
-import { Cloudinary } from "@cloudinary/url-gen";
-import { fill } from "@cloudinary/url-gen/actions/resize";
-import { quality, format } from "@cloudinary/url-gen/actions/delivery";
 import { CLOUDINARY_CLOUD_NAME } from '../../utils/cloudinaryConfig';
 
-const cld = new Cloudinary({ cloud: { cloudName: CLOUDINARY_CLOUD_NAME } });
-
+// --- DATOS DE LA FOTÓGRAFA ---
 const photographerInfo = {
   name: "SeVe",
-  imagePublicId: 'mi_perfil_seve_2025', // Correcto según tu última edición en Cloudinary
+  imagePublicId: 'mi_perfil_seve_2025', // TU PUBLIC ID CONFIRMADO
   tagline: "Fotógrafa apasionada por capturar la belleza en lo auténtico.",
   bio: [
     "¡Hola! Soy SeVe, y la fotografía es más que mi profesión, es mi manera de ver y sentir el mundo. Desde que descubrí el poder de una imagen para contar historias y preservar emociones, supe que quería dedicarme a ello.",
@@ -20,36 +15,26 @@ const photographerInfo = {
   ],
   equipmentHighlights: "Utilizo equipo profesional Canon Full-Frame y una selección de lentes prime luminosos para asegurar la máxima calidad y versatilidad en diferentes condiciones de luz. Siempre estoy explorando nuevas técnicas y herramientas para ofrecer lo mejor.",
   artisticFocus: "Me especializo en capturar la espontaneidad y la emoción real. Busco composiciones limpias, con un estilo editorial y atemporal, donde la luz y la conexión humana son protagonistas. Mi edición es cuidada para realzar la belleza natural sin perder autenticidad.",
-  instagramUser: "tuUsuarioInstagram",
-  whatsappNumber: "549XXXXXXXXXX",
-  emailAddress: "tuemail@example.com",
+  instagramUser: "tuUsuarioInstagram", // REEMPLAZA con tu usuario real
+  whatsappNumber: "549XXXXXXXXXX",    // REEMPLAZA con tu número real
+  emailAddress: "tuemail@example.com", // REEMPLAZA con tu email real
 };
+// --- FIN DE DATOS ---
 
 const AboutPage = () => {
-  console.log("AboutPage - CLOUDINARY_CLOUD_NAME:", CLOUDINARY_CLOUD_NAME);
-  console.log("AboutPage - photographerInfo.imagePublicId:", photographerInfo.imagePublicId);
+  let profileImageUrl = null;
+  const canDisplayImage = photographerInfo.imagePublicId &&
+                         CLOUDINARY_CLOUD_NAME &&
+                         CLOUDINARY_CLOUD_NAME !== 'TU_CLOUD_NAME_AQUI'; // Verifica contra el placeholder original
 
-  let profileImage = null;
-  // Condición CORREGIDA para generar la imagen:
-  const canDisplayCloudinaryImage = photographerInfo.imagePublicId &&
-                                   CLOUDINARY_CLOUD_NAME &&
-                                   CLOUDINARY_CLOUD_NAME !== 'TU_CLOUD_NAME_AQUI'; // Verifica contra el placeholder
-
-  if (canDisplayCloudinaryImage) {
-    console.log("AboutPage - Se cumplen condiciones, intentando generar imagen Cloudinary.");
-    profileImage = cld.image(photographerInfo.imagePublicId)
-      .resize(fill().width(400).height(400).gravity('face'))
-      .delivery(quality('auto'))
-      .delivery(format('auto'));
-    console.log("AboutPage - Objeto profileImage:", profileImage);
-    if (profileImage) {
-      console.log("AboutPage - URL generada:", profileImage.toURL());
-    }
+  if (canDisplayImage) {
+    profileImageUrl = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/w_600,c_limit,q_auto,f_auto/${photographerInfo.imagePublicId}`;
+    console.log("AboutPage - URL de Foto de Perfil Generada:", profileImageUrl);
   } else {
-    console.log("AboutPage - No se cumplen condiciones para generar imagen Cloudinary.");
-    if (!photographerInfo.imagePublicId) console.log("- Causa: photographerInfo.imagePublicId está vacío.");
-    if (!CLOUDINARY_CLOUD_NAME) console.log("- Causa: CLOUDINARY_CLOUD_NAME es undefined o null.");
-    if (CLOUDINARY_CLOUD_NAME === 'TU_CLOUD_NAME_AQUI') console.log("- Causa: CLOUDINARY_CLOUD_NAME sigue siendo el placeholder 'TU_CLOUD_NAME_AQUI'.");
+    console.log("AboutPage - No se puede generar URL de foto de perfil. Verifica imagePublicId y CLOUDINARY_CLOUD_NAME.");
+    if (CLOUDINARY_CLOUD_NAME === 'TU_CLOUD_NAME_AQUI') {
+        console.warn("AboutPage - CLOUDINARY_CLOUD_NAME sigue siendo el placeholder 'TU_CLOUD_NAME_AQUI' en cloudinaryConfig.js.");
+    }
   }
 
   return (
@@ -61,13 +46,15 @@ const AboutPage = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-8 md:gap-12 items-start">
         <div className="md:col-span-2 flex justify-center md:justify-start">
-          {profileImage ? (
+          {profileImageUrl ? (
             <div className="w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-full overflow-hidden shadow-soft-md border-4 border-white-off mx-auto md:mx-0">
-              <AdvancedImage
-                cldImg={profileImage}
-                plugins={[responsive(), placeholder({ mode: 'blur' })]}
-                className="w-full h-full object-cover"
+              <img
+                src={profileImageUrl}
                 alt={`Retrato de ${photographerInfo.name}`}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  console.error(`Error cargando foto de perfil: ${e.target.src}`, e);
+                }}
               />
             </div>
           ) : (
