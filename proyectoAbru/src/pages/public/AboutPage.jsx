@@ -16,9 +16,9 @@ const photographerInfo = {
   ],
   equipmentHighlights: "Utilizo equipo profesional Canon Full-Frame y una selección de lentes prime luminosos para asegurar la máxima calidad y versatilidad en diferentes condiciones de luz. Siempre estoy explorando nuevas técnicas y herramientas para ofrecer lo mejor.",
   artisticFocus: "Me especializo en capturar la espontaneidad y la emoción real. Busco composiciones limpias, con un estilo editorial y atemporal, donde la luz y la conexión humana son protagonistas. Mi edición es cuidada para realzar la belleza natural sin perder autenticidad.",
-  instagramUser: "tuUsuarioInstagram", // REEMPLAZA con tu usuario real
-  whatsappNumber: "549XXXXXXXXXX",    // REEMPLAZA con tu número real
-  emailAddress: "tuemail@example.com", // REEMPLAZA con tu email real
+  instagramUser: "https://www.instagram.com/seve.photography___?igsh=OGl6OGk0dzU5eWFh", // REEMPLAZA con tu usuario real
+  whatsappNumber: "3471339026",    // REEMPLAZA con tu número real
+  emailAddress: "abrilsevedegaston@gmail.com", // REEMPLAZA con tu email real
 };
 // --- FIN DE DATOS ---
 

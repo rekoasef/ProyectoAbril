@@ -1,15 +1,20 @@
 // src/pages/public/PortfolioPage.jsx
 import React, { useState, useEffect } from 'react';
-// Ya no necesitamos el Modal como componente separado si usamos la versión simple de abajo
-// import Modal from '../../components/common/Modal'; 
+import { Link } from 'react-router-dom'; // Añadido por si se necesita un Link a futuro
 
-// Helper para obtener imágenes de localStorage (debe ser la misma que en AdminPortfolioPage)
+// Helper para obtener imágenes de localStorage
+// Asegúrate de que esta función o una importada de localStorageHelpers.js use la clave correcta.
 const getStoredPortfolioImages = () => {
-  const images = localStorage.getItem('sevePhotographyFirebasePortfolio'); // Usar la nueva clave
-  return images ? JSON.parse(images) : [];
+  const images = localStorage.getItem('sevePhotographyFirebasePortfolio'); // Clave para Firebase
+  try {
+    const parsed = JSON.parse(images);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
 };
 
-// Componente Modal simple (si no usas uno común)
+// Componente Modal simple
 const ImageModal = ({ isOpen, onClose, image }) => {
   if (!isOpen || !image) return null;
 
@@ -29,7 +34,7 @@ const ImageModal = ({ isOpen, onClose, image }) => {
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
-        {image.url ? ( // image.url es la downloadURL de Firebase
+        {image.url ? (
           <img
             src={image.url}
             alt={image.title || "Imagen del portfolio"}
@@ -56,9 +61,9 @@ const PortfolioPage = () => {
   const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
-    const loadedImages = getStoredPortfolioImages();
-    setImages(loadedImages);
-    setFilteredImages(loadedImages); // Mostrar todas al inicio
+    const loadedImages = getStoredPortfolioImages(); // Carga desde localStorage
+    setImages(loadedImages.reverse()); // Mostrar las más nuevas primero en el portfolio público
+    setFilteredImages(loadedImages.reverse()); 
     if (loadedImages.length > 0) {
       const uniqueCategories = ['Todos', ...new Set(loadedImages.map(img => img.category).filter(Boolean))];
       setCategories(uniqueCategories);
@@ -70,7 +75,7 @@ const PortfolioPage = () => {
   const handleFilter = (category) => {
     setSelectedCategory(category);
     if (category === 'Todos') {
-      setFilteredImages(images);
+      setFilteredImages(images); // 'images' ya está en el orden deseado
     } else {
       setFilteredImages(images.filter(img => img.category === category));
     }
@@ -117,11 +122,11 @@ const PortfolioPage = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
           {filteredImages.map((image) => (
             <div
-              key={image.id || image.firebasePath} // Usar un ID único
+              key={image.id || image.firebasePath}
               className="aspect-[4/3] bg-beige-light rounded-lg overflow-hidden shadow-soft hover:shadow-soft-md transition-all duration-300 cursor-pointer group"
               onClick={() => openImageModal(image)}
             >
-              {image.url ? ( // image.url es la downloadURL de Firebase
+              {image.url ? (
                 <img
                   src={image.url}
                   alt={image.title || `Fotografía de ${image.category}`}

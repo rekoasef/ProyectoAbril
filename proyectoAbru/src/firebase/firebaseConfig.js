@@ -23,7 +23,8 @@ const app = initializeApp(firebaseConfig);
 // Inicializar Firebase Storage y exportarlo para usarlo en tu aplicación
 export const storage = getStorage(app);
 
-// Ejemplo para Firestore (si lo usas después)
+// Ejemplo para Firestore (si lo.
+//  usas después)
 // export const db = getFirestore(app);
 
 // Ejemplo para Firebase Auth (si lo usas después)

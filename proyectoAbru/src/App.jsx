@@ -8,7 +8,6 @@ import AdminLayout from './components/layout/AdminLayout';
 import ProtectedRoute from './components/common/ProtectedRoute';
 
 // Páginas Públicas
-// ... (tus importaciones de páginas públicas)
 import HomePage from './pages/public/HomePage';
 import PortfolioPage from './pages/public/PortfolioPage';
 import ServicesPage from './pages/public/ServicesPage';
@@ -16,12 +15,12 @@ import AboutPage from './pages/public/AboutPage';
 import ContactPage from './pages/public/ContactPage';
 import NotFoundPage from './pages/public/NotFoundPage';
 
-
 // Páginas de Admin
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
-import AdminPortfolioPage from './pages/admin/AdminPortfolioPage'; // <--- AÑADIR IMPORTACIÓN
-import AdminServicesPage from './pages/admin/AdminServicesPage'
+import AdminPortfolioPage from './pages/admin/AdminPortfolioPage';
+import AdminServicesPage from './pages/admin/AdminServicesPage';
+import AdminReviewsPage from './pages/admin/AdminReviewsPage'; // Importar la nueva página de reseñas
 
 function App() {
   return (
@@ -46,13 +45,12 @@ function App() {
         }
       >
         <Route index element={<AdminDashboardPage />} />
-        <Route path="portfolio" element={<AdminPortfolioPage />} /> {/* <--- AÑADIR RUTA */}
-        <Route path="servicios" element={<AdminServicesPage />} /> {/* <--- AÑADIR RUTA */}
-        {/* Aquí irán más rutas de admin anidadas, ej:
+        <Route path="portfolio" element={<AdminPortfolioPage />} />
         <Route path="servicios" element={<AdminServicesPage />} />
-        */}
+        <Route path="reseñas" element={<AdminReviewsPage />} /> {/* Ruta para la gestión de reseñas */}
       </Route>
 
+      {/* Ruta global para páginas no encontradas */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

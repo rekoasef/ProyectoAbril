@@ -24,3 +24,18 @@ export const getStoredServices = () => {
 export const storeServices = (services) => {
   localStorage.setItem('sevePhotographyServices', JSON.stringify(services));
 };
+
+// Para Reseñas/Testimonios
+export const getStoredReviews = () => {
+  const reviewsData = localStorage.getItem('sevePhotographyReviews');
+  try {
+    const parsed = JSON.parse(reviewsData);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return []; // Devuelve array vacío si hay error o no hay datos
+  }
+};
+
+export const storeReviews = (reviews) => {
+  localStorage.setItem('sevePhotographyReviews', JSON.stringify(reviews));
+};

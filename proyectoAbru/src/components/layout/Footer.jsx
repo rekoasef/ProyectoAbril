@@ -6,9 +6,9 @@ import { Instagram, Mail, Phone } from 'lucide-react'; // Phone ya está aquí
 const Footer = () => {
   const year = new Date().getFullYear();
   // Reemplaza con tus datos reales
-  const instagramUser = "tuUsuarioInstagram";
-  const whatsappNumber = "549XXXXXXXXXX"; // Formato internacional sin + ni espacios para el link wa.me
-  const emailAddress = "tuemail@example.com";
+  const instagramUser = "https://www.instagram.com/seve.photography___?igsh=OGl6OGk0dzU5eWFh";
+  const whatsappNumber = "3471339026"; // Formato internacional sin + ni espacios para el link wa.me
+  const emailAddress = "abrilsevedegaston@gmail.com";
 
   return (
     <footer className="bg-beige-light text-text-secondary py-10 mt-16 border-t border-sepia-gray-soft/30">

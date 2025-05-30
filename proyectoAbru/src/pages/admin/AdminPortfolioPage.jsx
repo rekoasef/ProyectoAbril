@@ -1,10 +1,19 @@
 // src/pages/admin/AdminPortfolioPage.jsx
-import { getStoredPortfolioImagesFS as getStoredPortfolioImages, storePortfolioImagesFS as storePortfolioImages } from '../../utils/localStorageHelpers';
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { UploadCloud, Eye, Trash2 } from 'lucide-react';
-import { storage } from '../../firebase/firebaseConfig'; // Importar storage de Firebase
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
+import { storage } from '../../firebase/firebaseConfig';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage"; // Asegúrate que deleteObject esté importado
+
+// Funciones para localStorage
+const getStoredPortfolioImages = () => {
+  const images = localStorage.getItem('sevePhotographyFirebasePortfolio');
+  return images ? JSON.parse(images) : [];
+};
+
+const storePortfolioImages = (images) => {
+  localStorage.setItem('sevePhotographyFirebasePortfolio', JSON.stringify(images));
+};
 
 const AdminPortfolioPage = () => {
   const { register, handleSubmit, reset, watch, formState: { errors, isSubmitting } } = useForm();
@@ -16,7 +25,7 @@ const AdminPortfolioPage = () => {
     setPortfolioImages(getStoredPortfolioImages().reverse());
   }, []);
 
-  const imageFileWatcher = watch("imageFile"); // Renombrado para claridad
+  const imageFileWatcher = watch("imageFile");
 
   useEffect(() => {
     if (imageFileWatcher && imageFileWatcher[0]) {
@@ -38,23 +47,22 @@ const AdminPortfolioPage = () => {
     }
 
     const file = data.imageFile[0];
-    // Crear una referencia única en Firebase Storage (ej. portfolio_images/nombreArchivo_timestamp.ext)
     const fileExtension = file.name.split('.').pop();
     const uniqueFileName = `${file.name.split('.')[0]}_${Date.now()}.${fileExtension}`;
-    const storageRef = ref(storage, `portfolio_images/${uniqueFileName}`);
+    const storageRefPath = `portfolio_images/${uniqueFileName}`; // Carpeta para imágenes del portfolio
+    const storageRef = ref(storage, storageRefPath);
     
     setUploadStatus({ message: 'Subiendo imagen...', type: 'info', progress: 0 });
-
     const uploadTask = uploadBytesResumable(storageRef, file);
 
     uploadTask.on('state_changed',
       (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        setUploadStatus(prev => ({ ...prev, message: `Subiendo: ${Math.round(progress)}%`, progress: Math.round(progress) }));
+        const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+        setUploadStatus(prev => ({ ...prev, message: `Subiendo: ${progress}%`, progress }));
       },
       (error) => {
         console.error("AdminPortfolioPage - Error al subir a Firebase Storage:", error);
-        setUploadStatus({ message: `Error al subir: ${error.message}`, type: 'error', progress: 0 });
+        setUploadStatus({ message: `Error al subir: ${error.code || error.message}`, type: 'error', progress: 0 });
       },
       async () => {
         try {
@@ -62,13 +70,13 @@ const AdminPortfolioPage = () => {
           setUploadStatus({ message: `¡Imagen "${data.title}" subida con éxito!`, type: 'success', progress: 100 });
 
           const newImageMetadata = {
-            id: uploadTask.snapshot.ref.fullPath, // Usar fullPath como ID único
-            firebasePath: uploadTask.snapshot.ref.fullPath, // Guardar el path para posible borrado
-            url: downloadURL, // URL de descarga para mostrar
+            id: uploadTask.snapshot.ref.fullPath, // Usar fullPath como ID único y para borrado
+            firebasePath: uploadTask.snapshot.ref.fullPath,
+            url: downloadURL,
             title: data.title,
             category: data.category,
             uploadedAt: new Date().toISOString(),
-            fileName: uniqueFileName, // Guardar el nombre de archivo único
+            fileName: uniqueFileName,
           };
           console.log("AdminPortfolioPage - Metadata guardada (Firebase):", newImageMetadata);
 
@@ -78,33 +86,43 @@ const AdminPortfolioPage = () => {
           setPortfolioImages(updatedImages);
           reset();
           setImagePreview(null);
-          setTimeout(() => setUploadStatus({ message: '', type: '', progress: 0 }), 5000); // Limpiar mensaje después de 5s
+          setTimeout(() => setUploadStatus({ message: '', type: '', progress: 0 }), 5000);
         } catch (error) {
           console.error("AdminPortfolioPage - Error obteniendo downloadURL:", error);
-          setUploadStatus({ message: `Error obteniendo URL de descarga: ${error.message}`, type: 'error', progress: 0 });
+          setUploadStatus({ message: `Error obteniendo URL: ${error.code || error.message}`, type: 'error', progress: 0 });
         }
       }
     );
   };
 
   const handleDeleteImage = async (imageToDelete) => {
-    if (window.confirm(`¿Estás segura de que quieres eliminar "${imageToDelete.title}" del listado Y de Firebase Storage? Esta acción no se puede deshacer.`)) {
+    if (!imageToDelete || !imageToDelete.firebasePath) {
+        alert("Error: No se puede eliminar la imagen porque falta información (ruta de Firebase).");
+        return;
+    }
+    if (window.confirm(`¿Estás segura de que quieres eliminar "${imageToDelete.title}"? Esto también la borrará de Firebase Storage.`)) {
       try {
-        // Crear referencia al archivo en Firebase Storage para borrarlo
         const imageRef = ref(storage, imageToDelete.firebasePath);
         await deleteObject(imageRef);
         console.log(`Imagen ${imageToDelete.firebasePath} eliminada de Firebase Storage.`);
-
-        // Eliminar de localStorage y del estado
+        
         const currentImages = getStoredPortfolioImages();
         const updatedImages = currentImages.filter(img => img.id !== imageToDelete.id);
         storePortfolioImages(updatedImages);
-        setPortfolioImages(updatedImages.reverse()); // O solo updatedImages si ya estaban ordenadas
+        setPortfolioImages(updatedImages.reverse());
         alert(`Imagen "${imageToDelete.title}" eliminada con éxito.`);
+
       } catch (error) {
         console.error("Error eliminando imagen de Firebase Storage:", error);
-        alert(`Error al eliminar la imagen de Firebase Storage: ${error.message}. Es posible que necesites borrarla manualmente desde la consola de Firebase. La imagen ha sido eliminada del listado local.`);
-        // Opcionalmente, eliminar de localStorage incluso si falla en Firebase:
+        // Firebase Storage error codes: https://firebase.google.com/docs/storage/web/handle-errors
+        if (error.code === 'storage/object-not-found') {
+            alert(`Error: La imagen no se encontró en Firebase Storage. Puede que ya haya sido eliminada. Se quitará del listado.`);
+        } else if (error.code === 'storage/unauthorized') {
+            alert(`Error: No tienes permiso para eliminar esta imagen de Firebase Storage. Verifica las reglas de seguridad.`);
+        } else {
+            alert(`Error al eliminar la imagen de Firebase Storage: ${error.message}. Revise la consola para más detalles.`);
+        }
+        // Igualmente la quitamos de la lista local si hubo error en Firebase, para mantener consistencia con el intento
         const currentImages = getStoredPortfolioImages();
         const updatedImages = currentImages.filter(img => img.id !== imageToDelete.id);
         storePortfolioImages(updatedImages);
@@ -123,7 +141,7 @@ const AdminPortfolioPage = () => {
       <div className="bg-white p-6 md:p-8 rounded-lg shadow-md">
         <h2 className="text-xl font-semibold text-gray-700 mb-6 border-b pb-3">Subir Nueva Imagen</h2>
         {uploadStatus.message && (
-          <div>
+          <div> {/* ... (código del mensaje de estado y barra de progreso) ... */}
             <div className={`p-3 rounded-md text-sm mb-2 ${
               uploadStatus.type === 'success' ? 'bg-green-100 text-green-700' :
               uploadStatus.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
@@ -141,7 +159,7 @@ const AdminPortfolioPage = () => {
           </div>
         )}
         <form onSubmit={handleSubmit(onSubmitImage)} className="space-y-5">
-          {/* Campos del formulario (title, category, imageFile, preview) ... */}
+          {/* ... (campos del formulario title, category, imageFile) ... */}
           <div>
             <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
               Título de la Imagen <span className="text-red-500">*</span>
@@ -195,7 +213,7 @@ const AdminPortfolioPage = () => {
               <div key={image.id} className="border border-gray-200 rounded-lg p-3 space-y-2 shadow-sm hover:shadow-md transition-shadow relative group">
                 <div className="aspect-[4/3] bg-gray-100 rounded overflow-hidden mb-2">
                   <img
-                    src={image.url} // Esta es la downloadURL de Firebase
+                    src={image.url}
                     alt={`Miniatura de ${image.title || 'imagen del portfolio'}`}
                     className="w-full h-full object-cover"
                     onError={(e) => { console.error(`Error cargando imagen de Firebase para ${image.id}: ${e.target.src}`, e);}}
@@ -204,14 +222,14 @@ const AdminPortfolioPage = () => {
                 <p className="text-sm font-semibold text-gray-700 truncate" title={image.title}>{image.title}</p>
                 <p className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full inline-block">{image.category}</p>
                 <p className="text-xs text-gray-400">Subida: {new Date(image.uploadedAt).toLocaleDateString()}</p>
-                <p className="text-[10px] text-gray-400 truncate" title={image.fileName}>Archivo: {image.fileName}</p>
+                <p className="text-[10px] text-gray-400 truncate" title={image.firebasePath}>Path: {image.firebasePath}</p>
                 
                 <div className="absolute top-2 right-2 flex flex-col space-y-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   <a href={image.url} target="_blank" rel="noopener noreferrer" title="Ver imagen completa"
                     className="p-1.5 bg-blue-500 text-white rounded-full hover:bg-blue-600 shadow">
                     <Eye size={14} />
                   </a>
-                  <button onClick={() => handleDeleteImage(image)} title="Eliminar"
+                  <button onClick={() => handleDeleteImage(image)} title="Eliminar de Firebase y listado"
                     className="p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow">
                     <Trash2 size={14} />
                   </button>
