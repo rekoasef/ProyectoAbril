@@ -2,12 +2,27 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { PlusCircle, Edit3, Trash2, Save, XCircle, Star } from 'lucide-react';
-import { getStoredReviews, storeReviews } from '../../utils/localStorageHelpers';
+import { db } from '../../firebase/firebaseConfig'; // Importar db de Firebase
+import { 
+  collection, 
+  query, 
+  orderBy, 
+  onSnapshot, 
+  addDoc, 
+  doc, 
+  updateDoc, 
+  deleteDoc,
+  serverTimestamp, // Para la fecha de creación/actualización
+  Timestamp // Para convertir fechas si es necesario
+} from 'firebase/firestore';
+// Ya no usaremos los helpers de localStorage para las reseñas aquí
+// import { getStoredReviews, storeReviews } from '../../utils/localStorageHelpers';
 
 const AdminReviewsPage = () => {
   const [reviews, setReviews] = useState([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingReview, setEditingReview] = useState(null);
+  const [editingReview, setEditingReview] = useState(null); // null para nueva, objeto para editar
+  const [isLoading, setIsLoading] = useState(true); // Para estado de carga inicial
 
   const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm({
     defaultValues: {
@@ -15,12 +30,61 @@ const AdminReviewsPage = () => {
       reviewText: '',
       rating: 5,
       date: new Date().toISOString().split('T')[0],
-      approved: true,
+      approved: false, // Por defecto, las nuevas reseñas creadas por el admin podrían ser no aprobadas o aprobadas
     }
   });
 
   useEffect(() => {
-    setReviews(getStoredReviews().sort((a, b) => new Date(b.date) - new Date(a.date)));
+    setIsLoading(true);
+    // Escuchar cambios en la colección 'reviews' de Firestore, ordenadas por 'submittedAt' o 'date'
+    // Usaremos 'submittedAt' si lo guardamos con serverTimestamp(), o 'date' si es el campo que el admin puede editar.
+    // Si las reseñas de los usuarios usan 'submittedAt' y las del admin 'date', hay que unificar o manejar ambos.
+    // Por ahora, asumamos que todas las reseñas tendrán un campo 'date' (string) o 'submittedAt' (Timestamp de Firebase).
+    // Vamos a ordenar por 'submittedAt' si existe, sino por 'date' (más nuevas primero).
+    // Firestore no permite ordenar por campos que no existen en todos los documentos de la consulta.
+    // Es mejor tener un campo de fecha consistente, ej. 'createdAt' con serverTimestamp().
+    
+    // Para las reseñas enviadas por usuarios, guardamos 'submittedAt' (Timestamp)
+    // Para las creadas por admin, guardamos 'date' (string YYYY-MM-DD)
+    // Vamos a priorizar 'submittedAt' si existe, y si no, 'date'.
+    // Firestore es más eficiente si ordenas por un campo que todos los documentos tienen.
+    // Considera añadir 'createdAt: serverTimestamp()' a las reseñas que el admin crea.
+
+    const reviewsCollectionRef = collection(db, "reviews");
+    // Ordenar por 'submittedAt' descendente (más nuevas primero). Si algunas no tienen 'submittedAt', no aparecerán en este orden.
+    // O puedes ordenar por 'date' si todas tienen ese campo como string y es consistente.
+    // Para mejor ordenamiento, todas las reseñas deberían tener un campo de timestamp común.
+    // Vamos a asumir que las reseñas de usuarios tienen 'submittedAt' y las del admin 'date'.
+    // Esto puede ser problemático para ordenar. Lo ideal es unificar.
+    // Por ahora, ordenaremos por 'date' que el admin puede controlar.
+    const q = query(reviewsCollectionRef, orderBy("date", "desc"));
+
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const reviewsData = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        reviewsData.push({ 
+          id: doc.id, 
+          ...data,
+          // Asegurar que 'date' sea un string YYYY-MM-DD para el input type="date"
+          // y que 'approved' sea un booleano
+          date: data.date ? (data.date.toDate ? new Date(data.date.toDate()).toISOString().split('T')[0] : data.date) : new Date().toISOString().split('T')[0],
+          approved: data.approved === true, // Asegurar que sea booleano
+        });
+      });
+      // Si las reseñas de usuarios tienen 'submittedAt' y las del admin 'date',
+      // necesitaríamos una lógica de ordenamiento más compleja aquí después de obtener los datos,
+      // o unificar el campo de fecha en Firestore.
+      // Por ahora, el orderBy("date", "desc") de Firestore se aplicará.
+      setReviews(reviewsData);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching reviews from Firestore: ", error);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe(); // Limpiar el listener al desmontar
   }, []);
 
   useEffect(() => {
@@ -28,8 +92,12 @@ const AdminReviewsPage = () => {
       setValue("clientName", editingReview.clientName);
       setValue("reviewText", editingReview.reviewText);
       setValue("rating", editingReview.rating || 5);
-      setValue("date", editingReview.date ? new Date(editingReview.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
-      setValue("approved", editingReview.approved !== undefined ? editingReview.approved : true);
+      // Asegurar que la fecha esté en formato YYYY-MM-DD para el input
+      const dateToSet = editingReview.date ? 
+        (editingReview.date.toDate ? new Date(editingReview.date.toDate()).toISOString().split('T')[0] : editingReview.date) 
+        : new Date().toISOString().split('T')[0];
+      setValue("date", dateToSet);
+      setValue("approved", editingReview.approved !== undefined ? editingReview.approved : false);
       setIsFormOpen(true);
     } else {
       reset({
@@ -37,88 +105,114 @@ const AdminReviewsPage = () => {
         reviewText: '',
         rating: 5,
         date: new Date().toISOString().split('T')[0],
-        approved: true,
+        approved: false, // Nuevas reseñas por defecto no aprobadas (o true si prefieres)
       });
     }
   }, [editingReview, setValue, reset]);
 
-  const handleFormSubmit = (data) => {
-    console.log("AdminReviewsPage - handleFormSubmit - Datos recibidos del formulario:", data);
-
-    let updatedReviews;
-    // Asegurarse de que 'approved' sea un booleano y 'rating' un número
-    const reviewData = {
-        ...data,
-        rating: parseInt(data.rating, 10),
-        // El checkbox devuelve un booleano directamente si se registra bien.
-        // Si viniera como string 'true'/'false' de alguna forma, necesitaríamos:
-        // approved: data.approved === true || data.approved === 'true', 
-        approved: !!data.approved, // Simple coerción a booleano
+  const handleFormSubmit = async (data) => {
+    console.log("AdminReviewsPage - handleFormSubmit - Datos recibidos:", data);
+    const reviewDataToSave = {
+      clientName: data.clientName,
+      reviewText: data.reviewText,
+      rating: parseInt(data.rating, 10),
+      date: data.date, // Guardar como string YYYY-MM-DD
+      approved: !!data.approved,
+      // Si es una reseña nueva creada por el admin, podríamos añadir un serverTimestamp()
+      // para un campo 'adminCreatedAt' o 'lastModifiedAt'
+      lastModifiedAt: serverTimestamp()
     };
-    console.log("AdminReviewsPage - handleFormSubmit - Datos procesados (reviewData):", reviewData);
-
 
     if (editingReview) {
-      console.log("AdminReviewsPage - Editando reseña ID:", editingReview.id);
-      updatedReviews = reviews.map(r =>
-        r.id === editingReview.id ? { ...editingReview, ...reviewData } : r
-      );
+      console.log("AdminReviewsPage - Actualizando reseña ID:", editingReview.id);
+      const reviewDocRef = doc(db, "reviews", editingReview.id);
+      try {
+        await updateDoc(reviewDocRef, reviewDataToSave);
+        console.log("Reseña actualizada en Firestore");
+      } catch (error) {
+        console.error("Error actualizando reseña en Firestore: ", error);
+        alert("Error al actualizar la reseña.");
+        return;
+      }
     } else {
-      const newReviewId = `review-${Date.now()}`;
-      console.log("AdminReviewsPage - Creando nueva reseña ID:", newReviewId);
-      const newReview = { ...reviewData, id: newReviewId };
-      updatedReviews = [newReview, ...reviews]; // Añadir nueva reseña al principio para verla fácilmente
+      console.log("AdminReviewsPage - Creando nueva reseña");
+      // Para nuevas reseñas, también añadir 'submittedAt' para consistencia con las de usuarios
+      // o un campo 'createdAt' general.
+      reviewDataToSave.createdAt = serverTimestamp(); 
+      try {
+        await addDoc(collection(db, "reviews"), reviewDataToSave);
+        console.log("Nueva reseña añadida a Firestore");
+      } catch (error) {
+        console.error("Error añadiendo reseña a Firestore: ", error);
+        alert("Error al guardar la nueva reseña.");
+        return;
+      }
     }
-    
-    updatedReviews.sort((a,b) => new Date(b.date) - new Date(a.date)); // Reordenar por fecha
-    console.log("AdminReviewsPage - handleFormSubmit - Reviews actualizadas (antes de guardar):", updatedReviews);
-
-    setReviews(updatedReviews);
-    storeReviews(updatedReviews); // Guardar en localStorage
-    console.log("AdminReviewsPage - handleFormSubmit - Reviews guardadas en localStorage y estado actualizado.");
     
     setEditingReview(null);
     setIsFormOpen(false);
-    reset(); // Limpia el formulario a los valores por defecto
+    reset();
   };
 
-  const handleAddNewReview = () => { /* ... (sin cambios, pero asegúrate que reset() ponga bien los defaults) ... */ 
+  const handleAddNewReview = () => {
     setEditingReview(null);
-    reset({ clientName: '', reviewText: '', rating: 5, date: new Date().toISOString().split('T')[0], approved: true });
+    // reset() ya se encarga de los valores por defecto en el useEffect
     setIsFormOpen(true);
   };
-  const handleEditReview = (reviewToEdit) => { /* ... (sin cambios) ... */ 
+
+  const handleEditReview = (reviewToEdit) => {
     setEditingReview(reviewToEdit);
   };
-  const handleDeleteReview = (reviewId) => { /* ... (sin cambios) ... */ 
-    if (window.confirm("¿Estás segura de que quieres eliminar esta reseña?")) {
-      const updatedReviews = reviews.filter(r => r.id !== reviewId);
-      setReviews(updatedReviews);
-      storeReviews(updatedReviews);
-      if (editingReview && editingReview.id === reviewId) {
-        setIsFormOpen(false);
-        setEditingReview(null);
-        reset();
+
+  const handleDeleteReview = async (reviewId) => {
+    if (window.confirm("¿Estás segura de que quieres eliminar esta reseña permanentemente de la base de datos?")) {
+      console.log("AdminReviewsPage - Eliminando reseña ID:", reviewId);
+      const reviewDocRef = doc(db, "reviews", reviewId);
+      try {
+        await deleteDoc(reviewDocRef);
+        console.log("Reseña eliminada de Firestore");
+        // El listener onSnapshot actualizará la lista automáticamente
+        if (editingReview && editingReview.id === reviewId) {
+          setIsFormOpen(false);
+          setEditingReview(null);
+          reset();
+        }
+      } catch (error) {
+        console.error("Error eliminando reseña de Firestore: ", error);
+        alert("Error al eliminar la reseña.");
       }
     }
   };
-  const handleToggleApproved = (reviewId) => { /* ... (sin cambios) ... */ 
-    const updatedReviews = reviews.map(r => 
-      r.id === reviewId ? { ...r, approved: !r.approved } : r
-    );
-    updatedReviews.sort((a,b) => new Date(b.date) - new Date(a.date));
-    setReviews(updatedReviews);
-    storeReviews(updatedReviews);
+
+  const handleToggleApproved = async (reviewId, currentApprovalStatus) => {
+    console.log(`AdminReviewsPage - Cambiando estado de aprobación para reseña ID: ${reviewId} a ${!currentApprovalStatus}`);
+    const reviewDocRef = doc(db, "reviews", reviewId);
+    try {
+      await updateDoc(reviewDocRef, {
+        approved: !currentApprovalStatus,
+        lastModifiedAt: serverTimestamp()
+      });
+      console.log("Estado de aprobación actualizado en Firestore.");
+      // onSnapshot actualizará la UI
+    } catch (error) {
+      console.error("Error actualizando estado de aprobación: ", error);
+      alert("Error al cambiar el estado de aprobación.");
+    }
   };
-  const handleCancelEdit = () => { /* ... (sin cambios) ... */ 
+
+  const handleCancelEdit = () => {
     setIsFormOpen(false);
     setEditingReview(null);
     reset();
   };
 
-  // --- JSX del Formulario y Listado (sin cambios estructurales importantes, solo los que ya tenías) ---
+  if (isLoading) {
+    return <div className="text-center p-10">Cargando reseñas...</div>;
+  }
+
   return (
     <div className="space-y-8">
+      {/* ... (JSX del título y botón "Añadir Nueva Reseña" sin cambios) ... */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-semibold text-gray-800">Gestionar Reseñas</h1>
         {!isFormOpen && (
@@ -134,6 +228,7 @@ const AdminReviewsPage = () => {
 
       {isFormOpen && (
         <div className="bg-white p-6 md:p-8 rounded-lg shadow-md">
+          {/* ... (JSX del formulario sin cambios estructurales, pero ahora interactúa con Firestore) ... */}
           <div className="flex justify-between items-center mb-6 border-b pb-3">
             <h2 className="text-xl font-semibold text-gray-700">
               {editingReview ? "Editar Reseña" : "Añadir Nueva Reseña"}
@@ -169,7 +264,7 @@ const AdminReviewsPage = () => {
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-accent-script/50 focus:border-accent-script/80" />
                 </div>
                  <div>
-                    <label htmlFor="approved" className="flex items-center space-x-2 cursor-pointer mt-2 md:mt-0 py-2"> {/* Ajuste de padding y margen para alineación */}
+                    <label htmlFor="approved" className="flex items-center space-x-2 cursor-pointer mt-2 md:mt-0 py-2">
                         <input type="checkbox" id="approved" {...register("approved")} 
                                className="h-4 w-4 text-accent-script border-gray-300 rounded focus:ring-accent-script" />
                         <span className="text-sm font-medium text-gray-700">Aprobada</span>
@@ -191,14 +286,15 @@ const AdminReviewsPage = () => {
 
       <div className="bg-white p-6 md:p-8 rounded-lg shadow-md mt-10">
         <h2 className="text-xl font-semibold text-gray-700 mb-6 border-b pb-3">Listado de Reseñas ({reviews.length})</h2>
+        {/* ... (JSX del listado de reseñas, pero ahora los botones llaman a las funciones de Firestore) ... */}
         {reviews.length === 0 && !isFormOpen ? (
-          <p className="text-sm text-gray-500">No hay reseñas creadas. Haz clic en "Añadir Nueva Reseña" para empezar.</p>
+          <p className="text-sm text-gray-500">No hay reseñas. Las que envíen los usuarios aparecerán aquí pendientes de aprobación.</p>
         ) : reviews.length === 0 && isFormOpen ? (
-            <p className="text-sm text-gray-500">No hay reseñas creadas aún.</p>
+            <p className="text-sm text-gray-500">No hay reseñas aún.</p>
         ) : (
           <div className="space-y-4">
             {reviews.map(review => (
-              <div key={review.id} className={`p-4 border rounded-md ${review.approved ? 'border-gray-200 hover:shadow-sm' : 'border-yellow-400 bg-yellow-50 hover:shadow-sm'}`}>
+              <div key={review.id} className={`p-4 border rounded-md ${review.approved ? 'border-gray-200 bg-white' : 'border-yellow-400 bg-yellow-50'} hover:shadow-sm`}>
                 <div className="flex justify-between items-start">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center mb-1">
@@ -208,7 +304,8 @@ const AdminReviewsPage = () => {
                         </div>
                     </div>
                     <p className="text-xs text-gray-500">
-                        {new Date(review.date).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        {/* Mostrar la fecha de 'submittedAt' si existe (de usuarios) o 'date' (de admin) */}
+                        {review.submittedAt?.toDate ? new Date(review.submittedAt.toDate()).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }) : (review.date ? new Date(review.date + 'T00:00:00').toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Fecha no disponible')}
                         <span className={`ml-3 px-2 py-0.5 text-xs rounded-full ${review.approved ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                             {review.approved ? "Aprobada" : "Pendiente"}
                         </span>
@@ -225,7 +322,7 @@ const AdminReviewsPage = () => {
                         </button>
                     </div>
                     <button 
-                        onClick={() => handleToggleApproved(review.id)}
+                        onClick={() => handleToggleApproved(review.id, review.approved)}
                         title={review.approved ? "Marcar como Pendiente" : "Aprobar Reseña"}
                         className={`text-xs px-2 py-1 rounded-md ${review.approved ? "bg-yellow-500 hover:bg-yellow-600 text-white" : "bg-green-500 hover:bg-green-600 text-white"}`}
                     >

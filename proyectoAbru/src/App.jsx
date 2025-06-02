@@ -14,6 +14,7 @@ import ServicesPage from './pages/public/ServicesPage';
 import AboutPage from './pages/public/AboutPage';
 import ContactPage from './pages/public/ContactPage';
 import NotFoundPage from './pages/public/NotFoundPage';
+import TestimonialsPage from './pages/public/TestimonialsPage'; // Importar la nueva página de testimonios
 
 // Páginas de Admin
 import AdminLoginPage from './pages/admin/AdminLoginPage';
@@ -32,6 +33,7 @@ function App() {
         <Route path="servicios" element={<ServicesPage />} />
         <Route path="sobre-mi" element={<AboutPage />} />
         <Route path="contacto" element={<ContactPage />} />
+        <Route path="testimonios" element={<TestimonialsPage />} /> {/* Nueva ruta para testimonios */}
       </Route>
 
       {/* Rutas de Admin */}

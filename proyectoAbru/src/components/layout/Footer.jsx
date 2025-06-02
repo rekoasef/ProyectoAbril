@@ -49,7 +49,7 @@ const Footer = () => {
           &copy; {year} SeVe Photography. Todos los derechos reservados.
         </p>
         <p className="text-xs">
-          Diseño y desarrollo web por <a href="https://tuweb.com" target="_blank" rel="noopener noreferrer" className="font-semibold hover:text-accent-script">Tu Nombre/Empresa</a>
+          Diseño y desarrollo web por <a href="https://tuweb.com" target="_blank" rel="noopener noreferrer" className="font-semibold hover:text-accent-script">Renzo Asef</a>
         </p>
       </div>
     </footer>
