@@ -2,35 +2,77 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { PlusCircle, Edit3, Trash2, Save, XCircle } from 'lucide-react';
-import { storage } from '../../firebase/firebaseConfig'; // Importar storage de Firebase
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
-import { getStoredServices, storeServices } from '../../utils/localStorageHelpers';
+// Importaciones de Firebase: db (Firestore) y storage
+import { storage, db } from '../../firebase/firebaseConfig';
+import { 
+  ref, 
+  uploadBytesResumable, 
+  getDownloadURL, 
+  deleteObject 
+} from "firebase/storage";
+import { 
+  collection, 
+  addDoc, 
+  doc, 
+  updateDoc, 
+  deleteDoc, 
+  onSnapshot, 
+  query, 
+  orderBy,
+  serverTimestamp
+} from 'firebase/firestore';
 
-// TU API KEY DE CLOUDINARY (YA NO ES NECESARIA AQUÍ SI TODO ES FIREBASE)
-// const CLOUDINARY_API_KEY = '675717664235993'; 
+// Las funciones de localStorage ya no son necesarias aquí
+// import { getStoredServices, storeServices } from '../../utils/localStorageHelpers';
 
 const AdminServicesPage = () => {
   const [services, setServices] = useState([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingService, setEditingService] = useState(null);
+  const [editingService, setEditingService] = useState(null); // null para nuevo, objeto para editar
   
   const [serviceImageFilePreview, setServiceImageFilePreview] = useState(null);
   const [serviceImageUploadStatus, setServiceImageUploadStatus] = useState({ message: '', type: '', progress: 0 });
+  const [isLoading, setIsLoading] = useState(true); // Estado para carga inicial
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting: isFormSubmitting } } = useForm({
     defaultValues: {
-      name: '', description: '', price: '', equipment: '', payment: '', 
-      imageUrl: '', // Usaremos imageUrl para la URL de Firebase
+      name: '', 
+      description: '', 
+      price: '', 
+      equipment: '', 
+      payment: '', 
+      imageUrl: '', // Para la URL de la imagen de Firebase
+      firebasePath: '', // Para la ruta de la imagen en Storage
       serviceImageFile: null
     }
   });
 
   const serviceImageFileWatcher = watch("serviceImageFile");
 
+  // Efecto para cargar servicios desde Firestore
   useEffect(() => {
-    setServices(getStoredServices().sort((a, b) => a.name.localeCompare(b.name)));
+    setIsLoading(true);
+    const servicesCollectionRef = collection(db, "services_items");
+    // Ordenar por nombre o por fecha de creación, ej: orderBy("createdAt", "desc") o orderBy("name")
+    const q = query(servicesCollectionRef, orderBy("name", "asc")); 
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const servicesData = [];
+      querySnapshot.forEach((document) => {
+        servicesData.push({ id: document.id, ...document.data() });
+      });
+      setServices(servicesData);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error cargando servicios desde Firestore: ", error);
+      setServiceImageUploadStatus({ message: `Error al cargar servicios: ${error.message}`, type: 'error' });
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe(); // Limpiar listener al desmontar
   }, []);
 
+  // Efecto para popular el formulario cuando se edita un servicio
   useEffect(() => {
     if (editingService) {
       setValue("name", editingService.name);
@@ -38,8 +80,9 @@ const AdminServicesPage = () => {
       setValue("price", editingService.price);
       setValue("equipment", editingService.equipment || '');
       setValue("payment", editingService.payment || '');
-      setValue("imageUrl", editingService.imageUrl || ''); // Campo para la URL de Firebase
-      // Si hay una imageUrl existente, podríamos mostrarla como preview "actual"
+      setValue("imageUrl", editingService.imageUrl || ''); 
+      setValue("firebasePath", editingService.firebasePath || '');
+      
       if (editingService.imageUrl) {
         setServiceImageFilePreview(editingService.imageUrl); 
       } else {
@@ -47,45 +90,59 @@ const AdminServicesPage = () => {
       }
       setIsFormOpen(true);
     } else {
-      reset(); // Limpia todos los campos, incluyendo imageUrl y serviceImageFile
+      // Resetear formulario a valores por defecto, incluyendo imageUrl y firebasePath
+      reset({
+        name: '', description: '', price: '', equipment: '', payment: '', 
+        imageUrl: '', firebasePath: '', serviceImageFile: null
+      });
       setServiceImageFilePreview(null);
     }
   }, [editingService, setValue, reset]);
 
+  // Efecto para la vista previa de la imagen del servicio
   useEffect(() => {
     if (serviceImageFileWatcher && serviceImageFileWatcher[0]) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setServiceImageFilePreview(reader.result); // Vista previa del archivo nuevo
+        setServiceImageFilePreview(reader.result);
       };
       reader.readAsDataURL(serviceImageFileWatcher[0]);
     } else if (editingService && editingService.imageUrl) {
-      // Si se deselecciona un archivo nuevo y estamos editando, volver a la imagen actual del servicio
       setServiceImageFilePreview(editingService.imageUrl);
     } else if (!editingService) {
-      // Si no estamos editando y no hay archivo, limpiar preview
       setServiceImageFilePreview(null);
     }
   }, [serviceImageFileWatcher, editingService]);
 
+  // Manejar submit del formulario (crear o actualizar servicio)
   const handleFormSubmit = async (data) => {
     setServiceImageUploadStatus({ message: '', type: '', progress: 0 });
-    let serviceData = { ...data };
-    let newImageFirebasePath = editingService?.firebasePath || null; // Para borrado si se reemplaza
-    let uploadedImageUrl = editingService?.imageUrl || null; // Mantener la URL existente si no se sube nueva
+    let serviceDataToSave = { // Usar una nueva variable para los datos a guardar
+      name: data.name,
+      description: data.description,
+      price: data.price,
+      equipment: data.equipment || '',
+      payment: data.payment || '',
+      imageUrl: editingService?.imageUrl || '', // Mantener URL existente si no se sube nueva
+      firebasePath: editingService?.firebasePath || '', // Mantener path existente
+      // Añadir o actualizar timestamp
+      createdAt: editingService?.createdAt || serverTimestamp(), // Mantener si existe, sino nuevo
+      lastModifiedAt: serverTimestamp()
+    };
 
     // Si se seleccionó un nuevo archivo de imagen para el servicio
     if (data.serviceImageFile && data.serviceImageFile[0]) {
       const file = data.serviceImageFile[0];
       const fileExtension = file.name.split('.').pop();
-      const uniqueFileName = `service_${Date.now()}.${fileExtension}`;
-      const newStorageRefPath = `services_images/${uniqueFileName}`; // Carpeta para imágenes de servicios
-      const storageRef = ref(storage, newStorageRefPath);
+      const uniqueFileName = `service_${data.name.replace(/\s+/g, '_') || 'item'}_${Date.now()}.${fileExtension}`;
+      const newStorageRefPath = `services_images/${uniqueFileName}`;
+      const storageRefInstance = ref(storage, newStorageRefPath);
       
       setServiceImageUploadStatus({ message: 'Subiendo imagen del servicio...', type: 'info', progress: 0 });
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      const uploadTask = uploadBytesResumable(storageRefInstance, file);
 
       try {
+        // Esperar a que la subida se complete
         await new Promise((resolve, reject) => {
           uploadTask.on('state_changed',
             (snapshot) => {
@@ -93,73 +150,70 @@ const AdminServicesPage = () => {
               setServiceImageUploadStatus(prev => ({ ...prev, message: `Subiendo: ${Math.round(progress)}%`, progress: Math.round(progress) }));
             },
             (error) => {
-              console.error("AdminServicesPage - Error en listener de subida a Firebase:", error);
+              console.error("AdminServicesPage - Error en subida a Firebase Storage:", error);
               setServiceImageUploadStatus({ message: `Error subiendo imagen: ${error.code}`, type: 'error', progress: 0 });
-              reject(error);
+              reject(error); // Rechazar la promesa para detener el proceso
             },
-            async () => {
+            async () => { // Cuando la subida se completa
               try {
-                uploadedImageUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                // Si se está editando y había una imagen anterior, borrarla de Firebase
+                const uploadedImageUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                serviceDataToSave.imageUrl = uploadedImageUrl;
+                serviceDataToSave.firebasePath = newStorageRefPath;
+
+                // Si se está editando y había una imagen anterior, borrarla de Firebase Storage
                 if (editingService && editingService.firebasePath && editingService.firebasePath !== newStorageRefPath) {
                   const oldImageRef = ref(storage, editingService.firebasePath);
-                  try {
-                    await deleteObject(oldImageRef);
-                    console.log("Imagen anterior del servicio eliminada de Firebase:", editingService.firebasePath);
-                  } catch (deleteError) {
-                    console.error("Error eliminando imagen anterior del servicio de Firebase:", deleteError);
-                    // No bloquear el proceso si falla el borrado de la antigua, pero loguearlo.
-                  }
+                  await deleteObject(oldImageRef).catch(delError => console.warn("No se pudo borrar imagen anterior de Storage:", delError));
                 }
-                serviceData.firebasePath = newStorageRefPath; // Guardar el nuevo path para futuro borrado
                 setServiceImageUploadStatus({ message: 'Imagen del servicio subida con éxito.', type: 'success', progress: 100 });
-                resolve();
+                resolve(); // Resolver la promesa
               } catch (getUrlError) {
-                console.error("AdminServicesPage - Error obteniendo downloadURL para servicio:", getUrlError);
+                console.error("AdminServicesPage - Error obteniendo downloadURL:", getUrlError);
                 setServiceImageUploadStatus({ message: `Error obteniendo URL: ${getUrlError.code}`, type: 'error', progress: 0 });
-                reject(getUrlError);
+                reject(getUrlError); // Rechazar la promesa
               }
             }
           );
         });
       } catch (uploadError) {
-        // El error ya se manejó en el listener, solo retornamos para no continuar.
-        return;
+        // El error ya se manejó y mostró, simplemente no continuar con el guardado en Firestore.
+        return; 
       }
     }
     
-    serviceData.imageUrl = uploadedImageUrl; // Asignar la URL de la imagen (nueva o existente)
-    if (!serviceData.firebasePath && editingService) { // Si no se subió nueva imagen, mantener el path anterior
-        serviceData.firebasePath = editingService.firebasePath;
-    }
-    delete serviceData.serviceImageFile; 
+    // Guardar o actualizar en Firestore
+    try {
+      if (editingService) {
+        // Actualizar documento existente
+        const serviceDocRef = doc(db, "services_items", editingService.id);
+        await updateDoc(serviceDocRef, serviceDataToSave);
+        setServiceImageUploadStatus(prev => ({ ...prev, message: prev.message || 'Servicio actualizado con éxito.', type: prev.type === 'error' ? 'error' : 'success'}));
+      } else {
+        // Crear nuevo documento
+        await addDoc(collection(db, "services_items"), serviceDataToSave);
+        setServiceImageUploadStatus(prev => ({ ...prev, message: prev.message || 'Servicio creado con éxito.', type: prev.type === 'error' ? 'error' : 'success'}));
+      }
+      
+      setEditingService(null);
+      setIsFormOpen(false);
+      reset(); // Limpia el formulario completo
+      setServiceImageFilePreview(null);
+      // Limpiar mensaje de éxito después de un tiempo si no hubo error de subida
+      if(serviceImageUploadStatus.type !== 'error' && (!data.serviceImageFile || !data.serviceImageFile[0])){
+          setTimeout(() => setServiceImageUploadStatus({ message: '', type: '' }), 3000);
+      } else if (serviceImageUploadStatus.type === 'success') {
+          setTimeout(() => setServiceImageUploadStatus({ message: '', type: '' }), 3000);
+      }
 
-    let updatedServices;
-    if (editingService) {
-      updatedServices = services.map(s =>
-        s.id === editingService.id ? { ...editingService, ...serviceData } : s
-      );
-    } else {
-      const newService = { ...serviceData, id: `service-${Date.now()}` };
-      updatedServices = [...services, newService];
-    }
-    updatedServices.sort((a, b) => a.name.localeCompare(b.name));
-    setServices(updatedServices);
-    storeServices(updatedServices);
-    
-    setEditingService(null);
-    setIsFormOpen(false);
-    reset();
-    setServiceImageFilePreview(null);
-    if(serviceImageUploadStatus.type === 'success' || (!data.serviceImageFile || !data.serviceImageFile[0])){
-        setTimeout(() => setServiceImageUploadStatus({ message: '', type: '' }), 3000);
+    } catch (firestoreError) {
+        console.error("Error guardando servicio en Firestore:", firestoreError);
+        setServiceImageUploadStatus({ message: `Error guardando servicio: ${firestoreError.message}`, type: 'error' });
     }
   };
 
   const handleAddNewService = () => { 
-    setEditingService(null);
-    reset({ name: '', description: '', price: '', equipment: '', payment: '', imageUrl: '', serviceImageFile: null }); 
-    setServiceImageFilePreview(null);
+    setEditingService(null); // Asegura que se está creando uno nuevo
+    // El useEffect [editingService] se encargará de resetear el formulario
     setServiceImageUploadStatus({ message: '', type: '' });
     setIsFormOpen(true);
   };
@@ -167,30 +221,37 @@ const AdminServicesPage = () => {
   const handleEditService = (serviceToEdit) => { 
     setServiceImageUploadStatus({ message: '', type: '' });
     setEditingService(serviceToEdit);
-    // El useEffect se encargará de llenar el form y abrirlo
+    // El useEffect [editingService] se encargará de llenar el form y abrirlo
   };
 
   const handleDeleteService = async (serviceToDelete) => {
+    if (!serviceToDelete || !serviceToDelete.id) {
+        alert("Error: No se puede eliminar el servicio. Información incompleta.");
+        return;
+    }
     if (window.confirm(`¿Estás segura de que quieres eliminar el servicio "${serviceToDelete.name}"?`)) {
-      // Si el servicio tiene una imagen en Firebase, intentar borrarla
-      if (serviceToDelete.firebasePath) {
-        const imageRef = ref(storage, serviceToDelete.firebasePath);
-        try {
+      try {
+        // Si el servicio tiene una imagen en Firebase Storage, intentar borrarla
+        if (serviceToDelete.firebasePath) {
+          const imageRef = ref(storage, serviceToDelete.firebasePath);
           await deleteObject(imageRef);
           console.log(`Imagen del servicio ${serviceToDelete.firebasePath} eliminada de Firebase Storage.`);
-        } catch (error) {
-          console.error("Error eliminando imagen del servicio de Firebase:", error);
-          alert(`Error al eliminar la imagen del servicio de Firebase: ${error.message}. Es posible que necesites borrarla manualmente. El servicio se eliminará del listado local.`);
         }
-      }
 
-      const updatedServices = services.filter(s => s.id !== serviceToDelete.id);
-      setServices(updatedServices);
-      storeServices(updatedServices);
-      if (editingService && editingService.id === serviceToDelete.id) {
-        setIsFormOpen(false);
-        setEditingService(null);
-        reset();
+        // Eliminar el documento del servicio de Firestore
+        await deleteDoc(doc(db, "services_items", serviceToDelete.id));
+        console.log(`Servicio ${serviceToDelete.id} eliminado de Firestore.`);
+        
+        // La UI se actualizará automáticamente por el listener onSnapshot
+        alert(`Servicio "${serviceToDelete.name}" eliminado con éxito.`);
+        if (editingService && editingService.id === serviceToDelete.id) {
+          setIsFormOpen(false);
+          setEditingService(null);
+          reset();
+        }
+      } catch (error) {
+        console.error("Error eliminando servicio:", error);
+        alert(`Error al eliminar el servicio: ${error.message}. Es posible que necesites borrar la imagen manualmente si el servicio ya fue eliminado de la lista.`);
       }
     }
   };
@@ -198,15 +259,14 @@ const AdminServicesPage = () => {
   const handleCancelEdit = () => { 
     setIsFormOpen(false);
     setEditingService(null);
-    reset();
-    setServiceImageFilePreview(null);
+    // reset() es llamado por el useEffect de editingService
     setServiceImageUploadStatus({ message: '', type: '' });
   };
 
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-semibold text-gray-800">Gestionar Servicios</h1>
+        <h1 className="text-3xl font-semibold text-gray-800">Gestionar Servicios (Firestore)</h1>
         {!isFormOpen && (
           <button
             onClick={handleAddNewService}
@@ -229,6 +289,7 @@ const AdminServicesPage = () => {
             </button>
           </div>
 
+          {/* Mensaje de estado y barra de progreso de subida de imagen */}
           {serviceImageUploadStatus.message && (
             <div>
                 <div className={`p-3 rounded-md text-sm mb-2 ${
@@ -248,6 +309,7 @@ const AdminServicesPage = () => {
             </div>
           )}
 
+          {/* Formulario */}
           <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Nombre del Servicio <span className="text-red-500">*</span></label>
@@ -278,12 +340,12 @@ const AdminServicesPage = () => {
                     <input type="text" id="payment" {...register("payment")}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-accent-script/50 focus:border-accent-script/80" />
                 </div>
-                {/* Campo oculto para imageUrl, se llena programáticamente */}
+                {/* Campos ocultos para imageUrl y firebasePath, se llenan programáticamente */}
                 <input type="hidden" {...register("imageUrl")} />
-                {/* Campo oculto para firebasePath, se llena programáticamente */}
                 <input type="hidden" {...register("firebasePath")} />
             </div>
 
+            {/* Input para subir imagen del servicio */}
             <div>
               <label htmlFor="serviceImageFile" className="block text-sm font-medium text-gray-700 mb-1">
                 {editingService && editingService.imageUrl ? "Reemplazar Imagen Representativa" : "Subir Imagen Representativa"} (Opcional)
@@ -297,6 +359,7 @@ const AdminServicesPage = () => {
               />
             </div>
 
+            {/* Vista previa de la imagen del servicio */}
             {(serviceImageFilePreview || (editingService && editingService.imageUrl && !serviceImageFileWatcher?.[0])) && (
               <div className="mt-3 p-2 border border-gray-200 rounded-md inline-block">
                 <p className="text-xs font-medium text-gray-600 mb-1">
@@ -310,6 +373,7 @@ const AdminServicesPage = () => {
               </div>
             )}
             
+            {/* Botones de acción del formulario */}
             <div className="flex justify-end space-x-3 pt-3">
               <button type="button" onClick={handleCancelEdit} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 border border-gray-300">
                 Cancelar
@@ -323,9 +387,12 @@ const AdminServicesPage = () => {
         </div>
       )}
 
+      {/* Listado de Servicios */}
       <div className="bg-white p-6 md:p-8 rounded-lg shadow-md mt-10">
         <h2 className="text-xl font-semibold text-gray-700 mb-6 border-b pb-3">Listado de Servicios ({services.length})</h2>
-        {services.length === 0 && !isFormOpen ? (
+        {isLoading ? (
+            <p className="text-sm text-gray-500">Cargando servicios...</p>
+        ) : services.length === 0 && !isFormOpen ? (
           <p className="text-sm text-gray-500">No hay servicios creados. Haz clic en "Añadir Nuevo Servicio" para empezar.</p>
         ) : services.length === 0 && isFormOpen ? (
             <p className="text-sm text-gray-500">No hay servicios creados aún.</p>
@@ -333,19 +400,19 @@ const AdminServicesPage = () => {
           <ul className="space-y-4">
             {services.map(service => (
               <li key={service.id} className="p-4 border border-gray-200 rounded-md hover:shadow-sm transition-shadow">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 min-w-0"> {/* Para que el texto se ajuste */}
+                <div className="flex flex-col sm:flex-row justify-between items-start">
+                  <div className="flex-1 min-w-0 mb-3 sm:mb-0">
                     <h3 className="font-semibold text-gray-800 text-lg">{service.name}</h3>
                     <p className="text-xs text-gray-500 mt-0.5">ID: {service.id}</p>
                     <p className="text-sm text-gray-600 mt-1 max-w-prose whitespace-pre-wrap break-words">{service.description}</p>
                     {service.price && <p className="text-xs text-gray-500 mt-1"><strong>Precio:</strong> {service.price}</p>}
-                    {service.imageUrl && ( // Mostrar miniatura si existe imageUrl
+                    {service.imageUrl && (
                         <div className="mt-2">
-                            <img src={service.imageUrl} alt={`Imagen de ${service.name}`} className="max-h-20 rounded border"/>
+                            <img src={service.imageUrl} alt={`Imagen de ${service.name}`} className="max-h-20 w-auto rounded border"/>
                         </div>
                     )}
                   </div>
-                  <div className="flex space-x-2 flex-shrink-0 ml-4">
+                  <div className="flex space-x-2 flex-shrink-0 self-start sm:self-center sm:ml-4">
                     <button onClick={() => handleEditService(service)} title="Editar" className="p-1.5 text-blue-600 hover:text-blue-800 rounded-md hover:bg-blue-100">
                       <Edit3 size={16} />
                     </button>
