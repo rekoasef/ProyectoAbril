@@ -2,35 +2,39 @@
 import React, { useState } from 'react';
 import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { LogOut, Image, Briefcase, LayoutDashboard, MessageSquareText, Menu, X } from 'lucide-react'; // Añadido MessageSquareText
+import { LogOut, Image, Briefcase, LayoutDashboard, MessageSquareText, Menu, X } from 'lucide-react';
 
 const AdminLayout = () => {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/admin/login');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/admin/login');
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+    }
   };
 
   const commonLinkClasses = "flex items-center space-x-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150";
-  const activeLinkClasses = "bg-gray-900 text-white-off";
-  const inactiveLinkClasses = "text-gray-300 hover:bg-gray-700 hover:text-white-off";
+  const activeLinkClasses = "bg-gray-900 text-white";
+  const inactiveLinkClasses = "text-gray-300 hover:bg-gray-700 hover:text-white";
 
   const navItems = [
     { to: "/admin", text: "Dashboard", icon: <LayoutDashboard size={20} /> },
     { to: "/admin/portfolio", text: "Portfolio", icon: <Image size={20} /> },
     { to: "/admin/servicios", text: "Servicios", icon: <Briefcase size={20} /> },
-    { to: "/admin/reseñas", text: "Reseñas", icon: <MessageSquareText size={20} /> }, // Nuevo enlace
+    { to: "/admin/reseñas", text: "Reseñas", icon: <MessageSquareText size={20} /> },
   ];
 
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar (Desktop) */}
-      <aside className="hidden md:flex md:flex-shrink-0 w-64 flex-col bg-gray-800 text-white-off">
+      <aside className="hidden md:flex md:flex-shrink-0 w-64 flex-col bg-gray-800 text-white">
         <div className="flex items-center justify-center h-20 border-b border-gray-700">
-          <Link to="/admin" className="script-logo text-3xl text-white-off">
+          <Link to="/admin" className="text-3xl font-bold text-white">
             SeVe Admin
           </Link>
         </div>
@@ -39,7 +43,7 @@ const AdminLayout = () => {
             <NavLink
               key={item.text}
               to={item.to}
-              end={item.to === "/admin"} // 'end' solo para la ruta raíz del admin
+              end={item.to === "/admin"}
               className={({ isActive }) => `${commonLinkClasses} ${isActive ? activeLinkClasses : inactiveLinkClasses}`}
             >
               {item.icon}
@@ -50,7 +54,7 @@ const AdminLayout = () => {
         <div className="px-2 py-4 border-t border-gray-700">
           <button
             onClick={handleLogout}
-            className={`${commonLinkClasses} w-full text-gray-300 hover:bg-red-600 hover:text-white-off`}
+            className={`${commonLinkClasses} w-full text-gray-300 hover:bg-red-600 hover:text-white`}
           >
             <LogOut size={20} />
             <span>Cerrar Sesión</span>
@@ -61,10 +65,10 @@ const AdminLayout = () => {
       {/* Contenido Principal y Navbar Móvil */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Navbar Superior (para móvil) */}
-        <header className="md:hidden bg-gray-800 text-white-off shadow-md">
+        <header className="md:hidden bg-gray-800 text-white shadow-md">
           <div className="px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
-              <Link to="/admin" className="script-logo text-2xl text-white-off">
+              <Link to="/admin" className="text-2xl font-bold text-white">
                 SeVe Admin
               </Link>
               <button
@@ -87,7 +91,7 @@ const AdminLayout = () => {
                     key={item.text}
                     to={item.to}
                     end={item.to === "/admin"}
-                    onClick={() => setIsMobileMenuOpen(false)} // Cierra el menú al hacer clic
+                    onClick={() => setIsMobileMenuOpen(false)}
                     className={({ isActive }) => `${commonLinkClasses} ${isActive ? activeLinkClasses : inactiveLinkClasses}`}
                   >
                     {item.icon}
@@ -96,7 +100,7 @@ const AdminLayout = () => {
                 ))}
                 <button
                   onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}
-                  className={`${commonLinkClasses} w-full text-gray-300 hover:bg-red-600 hover:text-white-off`}
+                  className={`${commonLinkClasses} w-full text-gray-300 hover:bg-red-600 hover:text-white`}
                 >
                   <LogOut size={20} />
                   <span>Cerrar Sesión</span>
@@ -114,4 +118,5 @@ const AdminLayout = () => {
     </div>
   );
 };
+
 export default AdminLayout;

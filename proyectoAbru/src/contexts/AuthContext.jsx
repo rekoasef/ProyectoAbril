@@ -1,70 +1,61 @@
-// src/contexts/AuthContext.jsx
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { auth } from '../firebase/firebaseConfig';
+import { useNavigate } from 'react-router-dom';
 
-const AuthContext = createContext(null);
+// 1. Creamos el contexto
+const AuthContext = createContext();
 
-// ---- CONFIGURACIÓN DE CREDENCIALES DE ADMIN ----
-// ¡IMPORTANTE! Estas son credenciales hardcodeadas para simplicidad.
-// En una aplicación real con datos sensibles, NUNCA hagas esto.
-// Deberías usar un backend seguro para la autenticación.
-// Para este proyecto, como es un panel para una sola persona (la fotógrafa),
-// y los datos no son críticos más allá de su propio portfolio, es una simplificación aceptable
-// PERO considera cambiar estas credenciales regularmente o buscar una solución más robusta a futuro.
-const ADMIN_USERNAME = import.meta.env.VITE_ADMIN_USERNAME;
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
-// ---- FIN DE CONFIGURACIÓN DE CREDENCIALES ----
-
-export const AuthProvider = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loadingAuth, setLoadingAuth] = useState(true); // Para evitar flashes de contenido no autenticado
-
-  useEffect(() => {
-    // Comprueba si ya hay una sesión en localStorage al cargar la app
-    const storedAuth = localStorage.getItem('sevePhotographyAdminAuthenticated');
-    if (storedAuth === 'true') {
-      setIsAuthenticated(true);
-    }
-    setLoadingAuth(false);
-  }, []);
-
-  const login = (username, password) => {
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-      localStorage.setItem('sevePhotographyAdminAuthenticated', 'true');
-      setIsAuthenticated(true);
-      console.log("Admin login successful");
-      return true;
-    }
-    console.log("Admin login failed. Provided:", username, "Expected:", ADMIN_USERNAME);
-    return false;
-  };
-
-  const logout = () => {
-    localStorage.removeItem('sevePhotographyAdminAuthenticated');
-    setIsAuthenticated(false);
-    console.log("Admin logout");
-  };
-
-  // No renderizar hijos hasta que se haya verificado el estado de autenticación
-  if (loadingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <p className="text-text-secondary">Verificando autenticación...</p>
-        {/* Podrías poner un spinner aquí */}
-      </div>
-    );
-  }
-
-  return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout, loadingAuth }}>
-      {children}
-    </AuthContext.Provider>
-  );
+// 2. Creamos un hook personalizado para usar el contexto más fácilmente
+export const useAuth = () => {
+  return useContext(AuthContext);
 };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+// 3. Creamos el proveedor del contexto, que contendrá toda la lógica
+export const AuthProvider = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true); // Para saber si ya se verificó la autenticación inicial
+  const navigate = useNavigate();
+
+  // --- LÓGICA DE AUTENTICACIÓN DE FIREBASE ---
+
+  // Función para iniciar sesión
+  const login = (email, password) => {
+    // Usamos la función de Firebase, que devuelve una promesa
+    return signInWithEmailAndPassword(auth, email, password);
+  };
+
+  // Función para cerrar sesión
+  const logout = () => {
+    return signOut(auth);
+  };
+
+  // Efecto que se ejecuta una sola vez para verificar si el usuario ya está logueado
+  useEffect(() => {
+    // onAuthStateChanged es un "oyente" de Firebase que se activa
+    // cada vez que el estado de autenticación cambia (login/logout).
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user); // Si hay un usuario, lo guardamos en el estado. Si no, será null.
+      setLoading(false); // Marcamos que la carga inicial ha terminado.
+    });
+
+    // Nos desuscribimos del "oyente" cuando el componente se desmonta para evitar fugas de memoria
+    return unsubscribe;
+  }, []);
+
+  // --- VALORES QUE PROVEERÁ EL CONTEXTO ---
+  // Estos son los datos y funciones que otros componentes podrán usar
+  const value = {
+    currentUser,
+    login,
+    logout,
+  };
+
+  // El proveedor retorna el contexto con los valores, y solo si no está cargando,
+  // renderiza los componentes hijos (el resto de tu app).
+  return (
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
 };
