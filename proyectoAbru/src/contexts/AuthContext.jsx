@@ -10,8 +10,8 @@ const AuthContext = createContext(null);
 // Para este proyecto, como es un panel para una sola persona (la fotógrafa),
 // y los datos no son críticos más allá de su propio portfolio, es una simplificación aceptable
 // PERO considera cambiar estas credenciales regularmente o buscar una solución más robusta a futuro.
-const ADMIN_USERNAME = import.meta.env.VITE_ADMIN_USERNAME || 'admin';
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'sevephoto123';
+const ADMIN_USERNAME = import.meta.env.VITE_ADMIN_USERNAME;
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
 // ---- FIN DE CONFIGURACIÓN DE CREDENCIALES ----
 
 export const AuthProvider = ({ children }) => {
